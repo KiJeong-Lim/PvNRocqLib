@@ -54,12 +54,12 @@ Proof.
   destruct PROVE as (ps&INCL&(PF)).
   assert (PROVE : E.fromList ps ⊢ p).
   { exists ps. split. done. econstructor. exact PF. }
-  clear PF. rename sigma into s. revert Gamma p INCL PROVE s. induction ps as [ | q ps IH]; i.
+  clear PF. clear sigma. revert Gamma p INCL PROVE. induction ps as [ | q ps IH]; i.
   - clear INCL. destruct PROVE as (ps&INCL&(PF)).
     assert (ps_spec : forall q : frm L', ~ L.In q ps).
     { intros q q_in. done!. }
     clear INCL. eapply extend_proves with (Gamma := E.empty). done.
-    clear Gamma. revert s. induction PF; i.
+    clear Gamma. induction PF; i.
     + contradiction (ps_spec p (or_introl eq_refl)).
     + admit.
     + admit.
@@ -72,7 +72,41 @@ Proof.
     + admit.
     + admit.
     + admit.
-    +
+    + enough (HACK : forall phi : trms L' (function_arity_table L' f) -> trms L' (function_arity_table L' f) -> frm L', forall Gamma : ensemble (frm L'),
+        forall phi_a_b : forall a, forall b, forall PROVES : pairwise_equal Gamma (twilight_trms a) (twilight_trms b), Gamma ⊢ twilight_frm (phi a b),
+        (* forall phi_eq : forall ts, forall ts', twilight_frm (phi ts ts') = phi (twilight_trms ts) (twilight_trms ts'), *)
+        Gamma ⊢ twilight_frm (eqns_imp (prod_rec (fun _ : trms L' (function_arity_table L' f) * trms L' (function_arity_table L' f) => frm L') phi (varcouples (function_arity_table L' f))) (function_arity_table L' f))
+      ).
+      { unfold Fun_eqAxm. eapply HACK.
+        - simpl. ii. do 2 rewrite twilight_trm_unfold with (t := Fun_trm _ _). eapply proves_eqn_fun. exact PROVES.
+        (* - ii. reflexivity. *)
+      }
+      simpl. induction (function_arity_table L f) as [ | n IH]; simpl; ii.
+      * eapply phi_a_b. tauto.
+      * exploit (IH (fun ts => fun ts' => phi (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts'))).
+        { ii. eapply phi_a_b. split; trivial. do 2 rewrite twilight_trms_unfold with (ts := S_trms _ _ _). unfold head. }
+        { intros H. destruct (varcouples n) as [lhs rhs] eqn: H_OBS; simpl in *. eapply for_Imp_I. eapply extend_proves. 2: exact H. done!. }
+    (* enough (HACK : forall phi : trms L' (function_arity_table L' f) -> trms L' (function_arity_table L' f) -> frm L', forall Gamma : ensemble (frm L'),
+        forall phi_a_b : forall a, forall b, forall PROVES : pairwise_equal Gamma (twilight_trms a) (twilight_trms b), Gamma ⊢ twilight_frm (phi a b),
+        (* forall phi_eq : forall ts, forall ts', twilight_frm (phi ts ts') = phi (twilight_trms ts) (twilight_trms ts'), *)
+        Gamma ⊢ twilight_frm (eqns_imp (prod_rec (fun _ : trms L' (function_arity_table L' f) * trms L' (function_arity_table L' f) => frm L') phi (varcouples (function_arity_table L' f))) (function_arity_table L' f))
+      ).
+      { unfold Fun_eqAxm. eapply HACK.
+        - simpl. ii. do 2 rewrite twilight_trm_unfold with (t := Fun_trm _ _). eapply proves_eqn_fun. exact PROVES.
+        (* - ii. reflexivity. *)
+      }
+      simpl. induction (function_arity_table L f) as [ | n IH]; simpl; ii.
+      * eapply phi_a_b. tauto.
+      * exploit (IH (fun ts => fun ts' => phi (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts'))).
+        { ii. eapply phi_a_b. split; trivial. do 2 rewrite twilight_trms_unfold with (ts := S_trms _ _ _). unfold head. admit. }
+        { intros H. destruct (varcouples n) as [lhs rhs] eqn: H_OBS; simpl in *. eapply for_Imp_I.  } *)
+    (* enough (HACK : forall phi : trms L' (function_arity_table L' f) -> trms L' (function_arity_table L' f) -> frm L',
+        forall phi_a_b : forall a, forall b, forall PROVES : pairwise_equal E.empty a b, E.empty ⊢ phi a b,
+        E.empty ⊢ twilight_frm (eqns_imp (prod_rec (fun _ : trms L' (function_arity_table L' f) * trms L' (function_arity_table L' f) => frm L') phi (varcouples (function_arity_table L' f))) (function_arity_table L' f))
+      ).
+      { unfold Fun_eqAxm. eapply HACK. ii. eapply proves_eqn_fun. exact PROVES. }
+      simpl. induction (function_arity_table L f) as [ | n IH]; simpl; ii.
+      * eapply phi_a_b. *)
     + admit.
 Admitted. *)
 
