@@ -13,9 +13,14 @@ Import FolNotations.
 
 Module FolHilbert.
 
-Infix "⊢" := proves : type_scope.
+Infix "⊢" := HilbertFol.proves : type_scope.
+
+Definition inconsistent {L : language} (Gamma : ensemble (frm L)) : Prop :=
+  forall p, Gamma ⊢ p.
 
 Section HENKIN.
+
+#[local] Infix "=~=" := is_similar_to : type_scope.
 
 Context {L : language}.
 
@@ -33,7 +38,7 @@ Context {L : language}.
 
 #[local] Existing Instance frm_similarity_instance.
 
-#[local] Existing Instance subst_similarity_instance.
+#[local] Existing Instance frms_similarity_instance.
 
 Lemma Fun_eqAxm_HC_free (f : L'.(function_symbols))
   : forall c : Henkin_constants, HC_occurs_in_frm c (Fun_eqAxm f) = false.
@@ -93,7 +98,7 @@ Qed.
 
 #[local] Opaque Nat.mul Nat.div "mod".
 
-Lemma proves_substitutivity' (sigma : hsubst) (Gamma : ensemble (frm L')) (p : frm L')
+Lemma proves_hsubstitutivity (sigma : hsubst) (Gamma : ensemble (frm L')) (p : frm L')
   (PROVE : Gamma ⊢ p)
   : E.image (hsubst_frm sigma) Gamma ⊢ hsubst_frm sigma p.
 Proof.
@@ -127,7 +132,7 @@ Proof.
     + simpl. erewrite subst_hsubst_compat_in_frm. 2: ii; reflexivity.
       replace (hsubst_frm (to_hsubst (one_subst x t)) p) with (hsubst_frm (one_hsubst (inl x) t) p).
       * enough (WTS : (twilight_frm (hsubst_frm (one_hsubst (inl x) t) p)) ≡ (subst_frm (one_subst (2 * x) (twilight_trm t)) (twilight_frm p))).
-        {  rewrite WTS. eapply empty_proof_intro. eapply FA1. }
+        { rewrite WTS. eapply empty_proof_intro. eapply FA1. }
         eapply twilight_frm_one_hsubst.
       * eapply equiv_hsubst_in_frm_implies_hsubst_frm_same. ii. unfold one_hsubst, cons_hsubst, nil_hsubst. unfold to_hsubst. unfold one_subst, cons_subst, nil_subst.
         destruct z as [z | z].
@@ -152,6 +157,46 @@ Proof.
         { exact PROVE. }
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
 Qed.
+
+Lemma embed_frm_Fun_eqAxm (f : L.(function_symbols))
+  : embed_frm (@Fun_eqAxm L f) = @Fun_eqAxm L' f.
+Proof.
+  enough (HACK : forall phi : trms L (function_arity_table L f) -> trms L (function_arity_table L f) -> frm L, forall phi' : trms L' (function_arity_table L' f) -> trms L' (function_arity_table L' f) -> frm L',
+    forall INVARIANT : forall a, forall b, embed_frm (phi a b) = phi' (embed_trms a) (embed_trms b),
+    embed_frm (eqns_imp (prod_rec (fun _ => frm L) phi (varcouples (function_arity_table L f))) (function_arity_table L f)) = eqns_imp (prod_rec (fun _ => frm L') phi' (varcouples (function_arity_table L f))) (function_arity_table L f)
+  ).
+  { unfold Fun_eqAxm. simpl. ii; eapply HACK. ii; reflexivity. }
+  simpl. generalize (function_arity_table L f) as n; clear f. induction n as [ | n IH]; simpl; ii.
+  - rewrite INVARIANT. reflexivity.
+  - exploit (IH (fun ts => fun ts' => phi (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts')) (fun ts => fun ts' => phi' (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts'))).
+    + ii. rewrite INVARIANT. reflexivity.
+    + intros claim. destruct (@varcouples L n) as [lhs rhs] eqn: H_OBS, (@varcouples L' n) as [lhs' rhs'] eqn: H_OBS'; simpl. f_equal; trivial.
+Qed.
+
+Lemma embed_frm_Rel_eqAxm (R : L.(relation_symbols))
+  : embed_frm (@Rel_eqAxm L R) = @Rel_eqAxm L' R.
+Proof.
+  enough (HACK : forall phi : trms L (relation_arity_table L R) -> trms L (relation_arity_table L R) -> frm L, forall phi' : trms L' (relation_arity_table L' R) -> trms L' (relation_arity_table L' R) -> frm L',
+    forall INVARIANT : forall a, forall b, embed_frm (phi a b) = phi' (embed_trms a) (embed_trms b),
+    embed_frm (eqns_imp (prod_rec (fun _ => frm L) phi (varcouples (relation_arity_table L R))) (relation_arity_table L R)) = eqns_imp (prod_rec (fun _ => frm L') phi' (varcouples (relation_arity_table L R))) (relation_arity_table L R)
+  ).
+  { unfold Rel_eqAxm. simpl. ii; eapply HACK. ii; reflexivity. }
+  simpl. generalize (relation_arity_table L R) as n; clear R. induction n as [ | n IH]; simpl; ii.
+  - rewrite INVARIANT. reflexivity.
+  - exploit (IH (fun ts => fun ts' => phi (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts')) (fun ts => fun ts' => phi' (S_trms n (Var_trm (n + n)) ts) (S_trms n (Var_trm (S (n + n))) ts'))).
+    + ii. rewrite INVARIANT. reflexivity.
+    + intros claim. destruct (@varcouples L n) as [lhs rhs] eqn: H_OBS, (@varcouples L' n) as [lhs' rhs'] eqn: H_OBS'; simpl. f_equal; trivial.
+Qed.
+
+Lemma embed_proves (Gamma : ensemble (frm L)) (p : frm L)
+  (PROVES : Gamma ⊢ p)
+  : E.image embed_frm Gamma ⊢ embed_frm p.
+Admitted.
+
+Theorem similar_equiconsistent (Gamma : ensemble (frm L)) (Gamma' : ensemble (frm L'))
+  (SIM : Gamma =~= Gamma')
+  : inconsistent Gamma <-> inconsistent Gamma'.
+Admitted.
 
 End HENKIN.
 
