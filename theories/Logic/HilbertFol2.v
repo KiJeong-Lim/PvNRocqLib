@@ -98,26 +98,16 @@ Qed.
 
 #[local] Opaque Nat.mul Nat.div "mod".
 
-Lemma proves_hsubstitutivity (sigma : hsubst) (Gamma : ensemble (frm L')) (p : frm L')
+Lemma proves_twilight (Gamma : ensemble (frm L')) (p : frm L')
   (PROVE : Gamma ⊢ p)
-  : E.image (hsubst_frm sigma) Gamma ⊢ hsubst_frm sigma p.
+  : E.image twilight_frm Gamma ⊢ twilight_frm p.
 Proof.
-  assert (EQ1 : E.image (hsubst_frm sigma) Gamma == E.image (subst_frm (twilight sigma)) (E.image twilight_frm Gamma)).
-  { intros z. s!. split; intros [q [-> IN]].
-    - exists (twilight_frm q); split.
-      + eapply twilight_frm_lemma.
-      + done!.
-    - rewrite E.in_image_iff in IN. destruct IN as [p' [-> IN]]. exists p'. split.
-      + symmetry. eapply twilight_frm_lemma.
-      + done!.
-  }
-  rewrite EQ1. rewrite twilight_frm_lemma. eapply proves_substitutivity. clear EQ1.
   assert (empty_proof_intro : forall q : frm L', proof [] q -> E.empty ⊢ q).
   { ii. exists []. split. intros ?. done. econstructor. eassumption. }
   destruct PROVE as (ps&INCL&(PF)).
   assert (PROVE : E.fromList ps ⊢ p).
   { exists ps. split. done. econstructor. exact PF. }
-  clear PF. clear sigma. revert Gamma p INCL PROVE. induction ps as [ | q ps IH]; i.
+  clear PF. revert Gamma p INCL PROVE. induction ps as [ | q ps IH]; i.
   - clear INCL. destruct PROVE as (ps&INCL&(PF)).
     assert (ps_spec : forall q : frm L', ~ L.In q ps).
     { intros q q_in. done!. }
@@ -158,6 +148,22 @@ Proof.
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
 Qed.
 
+Lemma proves_hsubstitutivity (sigma : hsubst) (Gamma : ensemble (frm L')) (p : frm L')
+  (PROVE : Gamma ⊢ p)
+  : E.image (hsubst_frm sigma) Gamma ⊢ hsubst_frm sigma p.
+Proof.
+  assert (EQ1 : E.image (hsubst_frm sigma) Gamma == E.image (subst_frm (twilight sigma)) (E.image twilight_frm Gamma)).
+  { intros z. s!. split; intros [q [-> IN]].
+    - exists (twilight_frm q); split.
+      + eapply twilight_frm_lemma.
+      + done!.
+    - rewrite E.in_image_iff in IN. destruct IN as [p' [-> IN]]. exists p'. split.
+      + symmetry. eapply twilight_frm_lemma.
+      + done!.
+  }
+  rewrite EQ1. rewrite twilight_frm_lemma. eapply proves_substitutivity. eapply proves_twilight. exact PROVE.
+Qed.
+
 Lemma embed_frm_Fun_eqAxm (f : L.(function_symbols))
   : embed_frm (@Fun_eqAxm L f) = @Fun_eqAxm L' f.
 Proof.
@@ -189,8 +195,51 @@ Proof.
 Qed.
 
 Lemma embed_proves (Gamma : ensemble (frm L)) (p : frm L)
-  (PROVES : Gamma ⊢ p)
+  (PROVE : Gamma ⊢ p)
   : E.image embed_frm Gamma ⊢ embed_frm p.
+Proof.
+  assert (empty_proof_intro : forall q : frm L', proof [] q -> E.empty ⊢ q).
+  { ii. exists []. split. intros ?. done. econstructor. eassumption. }
+  destruct PROVE as (ps&INCL&(PF)).
+  assert (PROVE : E.fromList ps ⊢ p).
+  { exists ps. split. done. econstructor. exact PF. }
+  clear PF. revert Gamma p INCL PROVE. induction ps as [ | q ps IH]; i.
+  - clear INCL. destruct PROVE as (ps&INCL&(PF)).
+    assert (ps_spec : forall q : frm L, ~ L.In q ps).
+    { intros q q_in. done!. }
+    clear INCL. eapply extend_proves with (Gamma := E.empty). done.
+    clear Gamma. induction PF; i.
+    + contradiction (ps_spec p (or_introl eq_refl)).
+    + eapply for_Imp_E; [eapply IHPF1 | eapply IHPF2]; intros q'; specialize ps_spec with (q := q'); ss!.
+    + simpl. eapply for_All_I. done. eapply IHPF. done.
+    + simpl. eapply empty_proof_intro. eapply IMP1.
+    + simpl. eapply empty_proof_intro. eapply IMP2.
+    + simpl. eapply empty_proof_intro. eapply CP.
+    + simpl. eapply empty_proof_intro. rewrite embed_subst_frm.
+      replace (subst_frm (embed_trm ∘ one_subst x t)%prg (embed_frm p)) with (subst_frm (one_subst x (embed_trm t)) (embed_frm p)).
+      * eapply FA1.
+      * eapply equiv_subst_in_frm_implies_subst_frm_same. ii. unfold one_subst, cons_subst, nil_subst. unfold "∘"%prg. destruct (eq_dec z x) as [EQ1 | NE1]; trivial.
+    + simpl. eapply empty_proof_intro. eapply FA2.
+      red. rewrite embed_fvs_frm. exact NOT_FREE.
+    + simpl. eapply empty_proof_intro. eapply FA3.
+    + eapply proves_reflexivity.
+    + eapply for_Imp_I. eapply proves_symmetry. eapply for_ByHyp. done!.
+    + eapply for_Imp_I. eapply for_Imp_I. eapply proves_transitivity with (t2 := embed_trm (Var_trm 1)); eapply for_ByHyp; done!.
+    + rewrite embed_frm_Fun_eqAxm. eapply empty_proof_intro. exact (@EQN_FUN L' f).
+    + rewrite embed_frm_Rel_eqAxm. eapply empty_proof_intro. exact (@EQN_REL L' R).
+  - eapply for_Imp_E with (p := embed_frm q).
+    + change (E.image embed_frm Gamma ⊢ embed_frm (Imp_frm q p)). eapply IH.
+      * intros p' H_in. done!.
+      * rewrite Deduction_theorem. eapply extend_proves with (Gamma := E.fromList (q :: ps)).
+        { intros p' H_in. done!. }
+        { exact PROVE. }
+    + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
+Qed.
+
+Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
+  (PROVE : E.image embed_frm Gamma ⊢ embed_frm p)
+  : Gamma ⊢ p.
+Proof.
 Admitted.
 
 Theorem similar_equiconsistent (Gamma : ensemble (frm L)) (Gamma' : ensemble (frm L'))
