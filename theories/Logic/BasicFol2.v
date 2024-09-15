@@ -1224,6 +1224,52 @@ Proof.
       * destruct (eq_dec _ _) as [EQ | NE]; trivial. contradiction H_OBS. rewrite EQ. symmetry. eapply Nat.mod_unique with (q := y). lia. lia.
 Qed.
 
+Lemma untwilight_trm (t : trm L')
+  (HENKIN_FREE : forall c, HC_occurs_in_trm c t = false)
+  : twilight_trm t = subst_trm (fun z : ivar => Var_trm (z * 2)) t
+with untwilight_trms n (ts : trms L' n)
+  (HENKIN_FREE : forall c, HC_occurs_in_trms c ts = false)
+  : twilight_trms ts = subst_trms (fun z : ivar => Var_trm (z * 2)) ts.
+Proof.
+  - trm_ind t; simpl; ii.
+    + rewrite subst_trm_unfold. reflexivity.
+    + rewrite subst_trm_unfold. f_equal. eapply untwilight_trms. exact HENKIN_FREE.
+    + destruct c as [cc | hc].
+      * rewrite subst_trm_unfold. reflexivity.
+      * pose proof (HENKIN_FREE hc) as claim. rewrite HC_occurs_in_trm_Con_trm in claim. obs_eqb hc hc; [discriminate claim | contradiction].
+  - trms_ind ts; simpl; ii.
+    + rewrite subst_trms_unfold. reflexivity.
+    + rewrite subst_trms_unfold. f_equal.
+      * eapply untwilight_trm. intros c. specialize HENKIN_FREE with (c := c). s!. exact (proj1 HENKIN_FREE).
+      * eapply IH. intros c. specialize HENKIN_FREE with (c := c). s!. exact (proj2 HENKIN_FREE).
+Qed.
+
+Lemma untwilight_frm (p : frm L')
+  (HENKIN_FREE : forall c, HC_occurs_in_frm c p = false)
+  : twilight_frm p ≡ subst_frm (fun z : ivar => Var_trm (z * 2)) p.
+Proof.
+  frm_ind p.
+  - simpl. econs. eapply untwilight_trms. intros c. exact (HENKIN_FREE c).
+  - simpl. econs; eapply untwilight_trm; intros c; specialize HENKIN_FREE with (c := c); ss!.
+  - simpl. econs. eapply IH1; intros c; exact (HENKIN_FREE c).
+  - simpl. econs; [eapply IH1 | eapply IH2]; intros c; specialize HENKIN_FREE with (c := c); ss!.
+  - simpl. rewrite IH1. 2:{ intros c. exact (HENKIN_FREE c). } eapply alpha_All_frm with (z := 2 * y).
+    + rewrite Nat.mul_comm. eapply alpha_equiv_eq_intro. do 2 rewrite <- subst_compose_frm_spec. eapply equiv_subst_in_frm_implies_subst_frm_same.
+      intros u u_free. unfold subst_compose, one_subst, cons_subst, nil_subst. rewrite subst_trm_unfold with (t := Var_trm _). destruct (eq_dec u y) as [EQ1 | NE1].
+      * destruct (eq_dec _ _) as [EQ2 | NE2]; try lia. rewrite subst_trm_unfold. destruct (eq_dec _ _); done.
+      * destruct (eq_dec _ _) as [EQ2 | NE2]; try lia. rewrite subst_trm_unfold. destruct (eq_dec _ _) as [EQ3 | NE3]; try done.
+        exploit (@chi_frm_not_free L' (fun z : ivar => Var_trm (z * 2)) (All_frm y p1) u).
+        { s!. split; trivial. }
+        intros claim. rewrite <- EQ3 in claim. rewrite is_free_in_trm_unfold in claim. rewrite Nat.eqb_neq in claim. contradiction.
+    + ss!.
+    + set (s := fun z : ivar => Var_trm (z * 2)). set (chi := (chi_frm s (All_frm y p1))). s!. destruct (eq_dec (2 * y) chi) as [EQ1 | NE1]; [right | left]; trivial.
+      eapply frm_is_fresh_in_subst_iff. unfold frm_is_fresh_in_subst. s!. intros u u_free. destruct (eq_dec u y) as [EQ2 | NE2]; s!; lia.
+Qed.
+
+Lemma twilight_frm_one_hsubst (x : ivar) (t : trm L') (p : frm L')
+  : twilight_frm (hsubst_frm (one_hsubst (inl x) t) p) ≡ subst_frm (one_subst (2 * x) (twilight_trm t)) (twilight_frm p).
+Admitted.
+
 End TWILIGHT.
 
 Context {enum_function_symbols : isEnumerable L.(function_symbols)} {enum_constant_symbols : isEnumerable L.(constant_symbols)} {enum_relation_symbols : isEnumerable L.(relation_symbols)}.
