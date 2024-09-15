@@ -1266,9 +1266,68 @@ Proof.
       eapply frm_is_fresh_in_subst_iff. unfold frm_is_fresh_in_subst. s!. intros u u_free. destruct (eq_dec u y) as [EQ2 | NE2]; s!; lia.
 Qed.
 
+Lemma twilight_trm_spec (t : trm L')
+  : twilight_trm t = hsubst_trm (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) t
+with twilight_trms_spec n (ts : trms L' n)
+  : twilight_trms ts = hsubst_trms (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) ts.
+Proof.
+  - trm_ind t; simpl.
+    + reflexivity.
+    + f_equal. eapply twilight_trms_spec.
+    + destruct c as [cc | hc]; reflexivity.
+  - trms_ind ts; simpl.
+    + reflexivity.
+    + f_equal.
+      * eapply twilight_trm_spec.
+      * eapply IH.
+Qed.
+
+#[local] Hint Rewrite twilight_trm_spec twilight_trms_spec : simplication_hints.
+#[local] Hint Constructors alpha_equiv : core.
+
+Lemma twilight_frm_spec (p : frm L')
+  : twilight_frm p ≡ hsubst_frm (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) p.
+Proof.
+  set (s := fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end).
+  frm_ind p; simpl.
+  - unfold s in *; ss!.
+  - unfold s in *; ss!.
+  - ss!.
+  - ss!.
+  - simpl. rewrite IH1. eapply alpha_All_frm with (z := 2 * y).
+    + rewrite Nat.mul_comm. rewrite subst_nil_frm with (s := one_subst (y * 2) (Var_trm (y * 2))).
+      2:{ ii. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec x (y * 2)); done!. }
+      erewrite subst_hsubst_compat_in_frm. 2: ii; reflexivity. symmetry. eapply alpha_equiv_eq_intro.
+      rewrite <- hsubst_compose_frm_spec. eapply equiv_hsubst_in_frm_implies_hsubst_frm_same. intros u u_free.
+      unfold hsubst_compose, one_subst, cons_hsubst, cons_subst, nil_subst. destruct (eqb _ _) as [ | ] eqn: H_OBS1.
+      * rewrite eqb_eq in H_OBS1. rewrite hsubst_trm_unfold. subst u. simpl. destruct (eq_dec _ _) as [EQ1 | NE1]; done!.
+      * rewrite eqb_neq in H_OBS1. erewrite <- subst_hsubst_compat_in_trm. 2: ii; reflexivity.
+        eapply subst_nil_trm. intros x x_free. destruct (eq_dec _ _) as [EQ1 | NE1]; trivial.
+        subst x. exploit (hchi_frm_not_free s (All_frm y p1) u).
+        { simpl. rewrite andb_true_iff, negb_true_iff, eqb_neq. split; trivial. }
+        intros claim. rewrite claim in x_free. discriminate.
+    + ss!.
+    + s!. set (hchi := hchi_frm s (All_frm y p1)). destruct (eq_dec (2 * y) hchi) as [EQ1 | NE1]; [right | left]; trivial.
+      eapply frm_is_fresh_in_hsubst_iff. unfold frm_is_fresh_in_hsubst. s!. intros u u_free. rewrite negb_true_iff.
+      unfold cons_hsubst. destruct (eqb _ _) as [ | ] eqn: H_OBS.
+      * ss!.
+      * rewrite eqb_neq in H_OBS. unfold s. destruct u as [x | hc]; ss!.
+Qed.
+
 Lemma twilight_frm_one_hsubst (x : ivar) (t : trm L') (p : frm L')
   : twilight_frm (hsubst_frm (one_hsubst (inl x) t) p) ≡ subst_frm (one_subst (2 * x) (twilight_trm t)) (twilight_frm p).
-Admitted.
+Proof.
+  rewrite twilight_frm_spec. set (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) as eta.
+  rewrite twilight_frm_spec. fold eta. erewrite subst_hsubst_compat_in_frm. 2: ii; reflexivity.
+  rewrite twilight_trm_spec. fold eta. do 2 rewrite <- hsubst_compose_frm_spec. eapply alpha_equiv_eq_intro. eapply equiv_hsubst_in_frm_implies_hsubst_frm_same.
+  ii. unfold hsubst_compose, to_hsubst, one_hsubst, cons_hsubst, nil_subst. destruct z as [z | z]; simpl.
+  - destruct (eqb _ _) as [ | ] eqn: H_OBS1; rewrite eqb_spec in H_OBS1.
+    + hinv H_OBS1. unfold one_subst, cons_subst, nil_subst. rewrite Nat.mul_comm. destruct (eq_dec _ _) as [EQ2 | NE2]; done.
+    + unfold one_subst, cons_subst, nil_subst. rewrite Nat.mul_comm. destruct (eq_dec _ _) as [EQ2 | NE2].
+      * assert (EQ : x = z) by lia. congruence.
+      * simpl. rewrite Nat.mul_comm. reflexivity.
+  - unfold one_subst, cons_subst, nil_subst. destruct (eq_dec _ _) as [EQ2 | NE2]; trivial. lia.
+Qed.
 
 End TWILIGHT.
 

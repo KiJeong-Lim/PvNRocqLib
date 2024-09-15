@@ -151,7 +151,7 @@ Proof.
         { intros p' H_in. done!. }
         { exact PROVE. }
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
-Admitted.
+Qed.
 
 End HENKIN.
 
