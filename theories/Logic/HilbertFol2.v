@@ -15,8 +15,25 @@ Module FolHilbert.
 
 Infix "⊢" := HilbertFol.proves : type_scope.
 
+Section EXTRA1.
+
 Definition inconsistent {L : language} (Gamma : ensemble (frm L)) : Prop :=
   forall p, Gamma ⊢ p.
+
+Context {L : language}.
+
+Lemma inconsistent_iff (Gamma : ensemble (frm L))
+  : inconsistent Gamma <-> (exists p, Gamma ⊢ p /\ Gamma ⊢ Neg_frm p).
+Proof.
+  split.
+  - intros INCONSISTENT. exists (Eqn_frm (Var_trm 0) (Var_trm 0)). split; eapply INCONSISTENT.
+  - intros [p [PROVE PROVE']] q. destruct PROVE as (ps&INCL&(PF)), PROVE' as (ps'&INCL'&(PF')).
+    exists (ps' ++ ps). split. done!. econs. eapply MP.
+    + rewrite <- L.app_nil_l with (l := ps'). eapply MP. exact (proof_ex_falso p q). exact PF'.
+    + exact PF.
+Qed.
+
+End EXTRA1.
 
 Section HENKIN.
 
@@ -30,15 +47,15 @@ Context {L : language}.
 
 #[local] Notation hsubst := (hatom -> trm L').
 
-#[local] Existing Instance constant_symbols_similarity_instance.
+#[local] Existing Instance constant_symbols_sim.
 
-#[local] Existing Instance trm_similarity_instance.
+#[local] Existing Instance trm_sim.
 
-#[local] Existing Instance trms_similarity_instance.
+#[local] Existing Instance trms_sim.
 
-#[local] Existing Instance frm_similarity_instance.
+#[local] Existing Instance frm_sim.
 
-#[local] Existing Instance frms_similarity_instance.
+#[local] Existing Instance frms_sim.
 
 Lemma Fun_eqAxm_HC_free (f : L'.(function_symbols))
   : forall c : Henkin_constants, HC_occurs_in_frm c (Fun_eqAxm f) = false.
@@ -236,16 +253,97 @@ Proof.
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
 Qed.
 
+(* Inductive proves_sim : frm L -> frm L' -> Prop :=
+  | proves_sim_atomic_has_hc p p' hc
+    (ATOMIC : frm_depth p' = 0)
+    (HAS_HC : occurs_free_in_frm hc p' = true)
+    (TRUE : p = Eqn_frm (Var_trm 0) (Var_trm 0))
+    : proves_sim p p'
+  | proves_sim_atomic_hcless p p'
+    (ATOMIC : frm_depth p' = 0)
+    (HCLESS : forall hc, occurs_free_in_frm hc p' = false)
+    (EMBED : embed_frm p = p')
+    : proves_sim p p'
+  | proves_sim_neg_frm p1 p1'
+    (SIM1 : proves_sim p1 p1')
+    : proves_sim (Neg_frm p1) (Neg_frm p1')
+  | proves_sim_imp_frm p1 p2 p1' p2'
+    (SIM1 : proves_sim p1 p1')
+    (SIM2 : proves_sim p2 p2')
+    : proves_sim (Imp_frm p1 p2) (Imp_frm p1' p2')
+  | proves_sim_all_frm y p1 p1'
+    (SIM1 : proves_sim p1 p1')
+    : proves_sim (All_frm y p1) (All_frm y p1').
+
+Lemma proves_sim_witness (p' : frm L')
+  : exists p : frm L, proves_sim p p'.
+Admitted.
+
+Lemma proves_sim_intro (p : frm L)
+  : proves_sim p (embed_frm p).
+Admitted.
+
 Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
   (PROVE : E.image embed_frm Gamma ⊢ embed_frm p)
   : Gamma ⊢ p.
 Proof.
+  destruct PROVE as (ps&INCL&(PF)).
+  assert (claim : exists qs : list (frm L), ps = L.map embed_frm qs).
+  { clear PF p. revert Gamma INCL; induction ps as [ | p ps IH]; simpl; i.
+    - exists []. reflexivity.
+    - exploit (IH Gamma). done!. intros [qs ->]. exploit (INCL p). done!.
+      intros IN. s!. destruct IN as [q [-> IN]]. exists (q :: qs). reflexivity.
+  }
+  destruct claim as [qs claim]. subst ps.
+  assert (PROVE : E.fromList (L.map embed_frm qs) ⊢ embed_frm p).
+  { exists (L.map embed_frm qs). split. done!. econs. exact PF. }
+  clear PF. revert Gamma p INCL PROVE. induction qs as [ | q qs IH]; i.
+  - clear INCL. destruct PROVE as (ps&INCL&(PF)).
+    assert (ps_spec : forall q : frm L', ~ L.In q ps).
+    { intros q q_in. done!. }
+    clear INCL. eapply extend_proves with (Gamma := E.empty). done.
+    clear Gamma. remember (embed_frm p) as p' eqn: H_p' in PF.
+    assert (INVARIANT : proves_sim p p').
+    { subst p'. eapply proves_sim_intro. }
+    clear H_p'. revert p INVARIANT. induction PF; intros q' ?.
+    + contradiction (ps_spec p (or_introl eq_refl)).
+    + rename p into A, q' into B.
+      assert (H1 : forall q : frm L', ~ In q ps1).
+      { ii; eapply ps_spec; done!. }
+      assert (H2 : forall q : frm L', ~ In q ps2).
+      { ii; eapply ps_spec; done!. }
+      specialize (IHPF1 H1). specialize (IHPF2 H2). clear H1 H2 ps_spec. rename B into p, q into B.
+      pose proof (proves_sim_witness A) as [q WITNESS]. eapply for_Imp_E with (p := q).
+      * eapply IHPF1. econs 4; trivial.
+      * eapply IHPF2; trivial.
+    + 
+  - eapply for_Imp_E with (p := q).
+    + eapply IH.
+      * intros p' H_in. exploit (INCL p'). ss!. intros IN. ss!.
+      * simpl. rewrite Deduction_theorem. eapply extend_proves with (Gamma := E.fromList (L.map embed_frm (q :: qs))).
+        { intros p' H_in. done!. }
+        { exact PROVE. }
+    + eapply for_ByHyp. exploit (INCL (embed_frm q)). ss!. intros IN. ss!. apply embed_frm_inj in H; subst x; done.
 Admitted.
 
 Theorem similar_equiconsistent (Gamma : ensemble (frm L)) (Gamma' : ensemble (frm L'))
   (SIM : Gamma =~= Gamma')
   : inconsistent Gamma <-> inconsistent Gamma'.
-Admitted.
+Proof.
+  split; intros INCONSISTENT.
+  - rewrite inconsistent_iff in INCONSISTENT. rewrite inconsistent_iff.
+    destruct INCONSISTENT as [p [PROVE PROVE']]. exists (embed_frm p).
+    rewrite <- embed_frms_spec in SIM. rewrite <- SIM. split.
+    + eapply embed_proves; trivial.
+    + change (E.image embed_frm Gamma ⊢ embed_frm (Neg_frm p)). eapply embed_proves; trivial.
+  - admit. (* rewrite <- embed_frms_spec in SIM. intros p. pose proof (INCONSISTENT (embed_frm p)) as PROVE.
+    rewrite <- SIM in PROVE. destruct PROVE as (ps&INCL&(PF)).
+    remember (embed_frm p) as p' eqn: H_p' in PF. symmetry in H_p'. rewrite embed_frm_spec in H_p'. rename p into A. revert A H_p'. induction PF; i.
+    + eapply for_ByHyp. rewrite <- embed_frm_spec in H_p'. subst p. exploit (INCL (embed_frm A)). done!.
+      intros IN. s!. destruct IN as [p [EQ IN]]. apply embed_frm_inj in EQ. subst p. exact IN.
+    + rewrite <- embed_frm_spec in H_p'. subst q. rename p into p', A into p.
+      pose proof (INCONSISTENT (embed_frm p)) as PROVE. *)
+Admitted. *)
 
 End HENKIN.
 

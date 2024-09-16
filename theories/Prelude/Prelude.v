@@ -1111,6 +1111,12 @@ Module L.
 
 Include Coq.Lists.List.
 
+Definition null {A : Type} (l : list A) : bool :=
+  match l with
+  | L.nil => true
+  | L.cons _ _ => false
+  end.
+
 #[global] Hint Rewrite in_map_iff in_app_iff : simplication_hints.
 
 Lemma in_remove_iff (A : Type) `(EQ_DEC : hasEqDec A) (x1 : A) (xs2 : list A)
