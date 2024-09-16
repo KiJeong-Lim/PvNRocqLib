@@ -1117,7 +1117,13 @@ Definition null {A : Type} (l : list A) : bool :=
   | L.cons _ _ => false
   end.
 
-#[global] Hint Rewrite in_map_iff in_app_iff : simplication_hints.
+Lemma null_spec (A : Type) (l : list A)
+  : forall b, null l = b <-> (if b then l = [] else l <> []).
+Proof.
+  destruct l; intros [ | ]; simpl; done!.
+Qed.
+
+#[global] Hint Rewrite null_spec in_map_iff in_app_iff : simplication_hints.
 
 Lemma in_remove_iff (A : Type) `(EQ_DEC : hasEqDec A) (x1 : A) (xs2 : list A)
   : forall z, In z (remove Prelude.eq_dec x1 xs2) <-> (In z xs2 /\ z <> x1).

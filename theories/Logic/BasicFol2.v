@@ -1509,21 +1509,21 @@ Proof.
   - des. rewrite <- GRAPH0. f_equal; eauto.
 Qed.
 
-Lemma embed_trm_inj (t1 : trm L) (t2 : trm L)
+Theorem embed_trm_inj (t1 : trm L) (t2 : trm L)
   (EQ : embed_trm t1 = embed_trm t2)
   : t1 = t2.
 Proof.
   symmetry. eapply embed_trm_inj_aux. rewrite <- EQ. eapply embed_trm_graph_complete. eapply embed_trm_spec. reflexivity.
 Qed.
 
-Lemma embed_trms_inj n (ts1 : trms L n) (ts2 : trms L n)
+Theorem embed_trms_inj n (ts1 : trms L n) (ts2 : trms L n)
   (EQ : embed_trms ts1 = embed_trms ts2)
   : ts1 = ts2.
 Proof.
   symmetry. eapply embed_trms_inj_aux. rewrite <- EQ. eapply embed_trms_graph_complete. eapply embed_trms_spec. reflexivity.
 Qed.
 
-Lemma embed_frm_inj (p1 : frm L) (p2 : frm L)
+Theorem embed_frm_inj (p1 : frm L) (p2 : frm L)
   (EQ : embed_frm p1 = embed_frm p2)
   : p1 = p2.
 Proof.
@@ -1610,6 +1610,48 @@ Lemma embed_frm_HC_free (p : frm L)
   : forall c : Henkin_constants, HC_occurs_in_frm c (embed_frm p) = false.
 Proof.
   frm_ind p; done!.
+Qed.
+
+Lemma embed_trm_inv (t' : trm L')
+  (HC_free : forall c, HC_occurs_in_trm c t' = false)
+  : exists t, embed_trm t = t'
+with embed_trms_inv (n : nat) (ts' : trms L' n)
+  (HC_free : forall c, HC_occurs_in_trms c ts' = false)
+  : exists ts, embed_trms ts = ts'.
+Proof.
+  - revert HC_free. trm_ind t'; simpl; i.
+    + exists (Var_trm x). reflexivity.
+    + exploit (embed_trms_inv _ ts). exact HC_free. intros [ts' <-]. exists (@Fun_trm L f ts'). reflexivity.
+    + destruct c as [cc | hc].
+      * exists (Con_trm cc). reflexivity.
+      * specialize HC_free with (c := hc). s!. contradiction.
+  - revert HC_free. trms_ind ts'; simpl; i.
+    + exists O_trms. reflexivity.
+    + exploit (embed_trm_inv t).
+      { ii. specialize HC_free with (c := c). ss!. }
+      exploit IH.
+      { ii. specialize HC_free with (c := c). ss!. }
+      intros [ts <-] [t' <-]. exists (@S_trms L n t' ts). reflexivity.
+Qed.
+
+Lemma embed_frm_inv (p' : frm L')
+  (HC_free : forall c, HC_occurs_in_frm c p' = false)
+  : exists p, embed_frm p = p'.
+Proof.
+  revert HC_free; frm_ind p'; simpl; i.
+  - exploit (embed_trms_inv _ ts). done!. intros [ts' <-]. exists (@Rel_frm L R ts'). reflexivity.
+  - exploit (embed_trm_inv t1).
+    { ii. specialize HC_free with (c := c). ss!. }
+    exploit (embed_trm_inv t2).
+    { ii. specialize HC_free with (c := c). ss!. }
+    intros [t2' <-] [t1' <-]. exists (Eqn_frm t1' t2'). reflexivity.
+  - exploit IH1. done!. intros [p1' <-]. exists (Neg_frm p1'). reflexivity.
+  - exploit IH1.
+    { ii. specialize HC_free with (c := c). ss!. }
+    exploit IH2.
+    { ii. specialize HC_free with (c := c). ss!. }
+    intros [p2' <-] [p1' <-]. exists (Imp_frm p1' p2'). reflexivity.
+  - exploit IH1. done!. intros [p1' <-]. exists (All_frm y p1'). reflexivity.
 Qed.
 
 Fixpoint twilight_trm' (t : trm L') : trm L :=

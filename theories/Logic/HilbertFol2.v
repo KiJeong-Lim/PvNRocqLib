@@ -253,40 +253,80 @@ Proof.
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
 Qed.
 
-(* Inductive proves_sim : frm L -> frm L' -> Prop :=
-  | proves_sim_atomic_has_hc p p' hc
-    (ATOMIC : frm_depth p' = 0)
-    (HAS_HC : occurs_free_in_frm hc p' = true)
-    (TRUE : p = Eqn_frm (Var_trm 0) (Var_trm 0))
-    : proves_sim p p'
-  | proves_sim_atomic_hcless p p'
-    (ATOMIC : frm_depth p' = 0)
-    (HCLESS : forall hc, occurs_free_in_frm hc p' = false)
-    (EMBED : embed_frm p = p')
-    : proves_sim p p'
-  | proves_sim_neg_frm p1 p1'
-    (SIM1 : proves_sim p1 p1')
-    : proves_sim (Neg_frm p1) (Neg_frm p1')
-  | proves_sim_imp_frm p1 p2 p1' p2'
-    (SIM1 : proves_sim p1 p1')
-    (SIM2 : proves_sim p2 p2')
-    : proves_sim (Imp_frm p1 p2) (Imp_frm p1' p2')
-  | proves_sim_all_frm y p1 p1'
-    (SIM1 : proves_sim p1 p1')
-    : proves_sim (All_frm y p1) (All_frm y p1').
+Fixpoint proves_sim (p : frm L) (p' : frm L') {struct p'} : Prop :=
+  match p' with
+  | Rel_frm R ts' => if L.null (accum_HCs_trms ts') then embed_frm p = p' else p = Eqn_frm (Var_trm 0) (Var_trm 0)
+  | Eqn_frm t1' t2' => if L.null (accum_HCs_trm t1') && L.null (accum_HCs_trm t2') then embed_frm p = p' else p = Eqn_frm (Var_trm 0) (Var_trm 0)
+  | Neg_frm p1' => exists p1, p = Neg_frm p1 /\ proves_sim p1 p1'
+  | Imp_frm p1' p2' => exists p1, exists p2, p = Imp_frm p1 p2 /\ proves_sim p1 p1' /\ proves_sim p2 p2'
+  | All_frm y p1' => exists p1, p = All_frm y p1 /\ proves_sim p1 p1'
+  end.
+
+Lemma proves_sim_unique (p' : frm L') (p1 : frm L) (p2 : frm L)
+  (SIM1 : proves_sim p1 p')
+  (SIM2 : proves_sim p2 p')
+  : p1 = p2.
+Proof.
+  revert p1 p2 SIM1 SIM2. frm_ind p'; simpl.
+  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
+    + eapply embed_frm_inj. congruence.
+    + congruence.
+  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
+    + eapply embed_frm_inj. congruence.
+    + congruence.
+  - rename p1 into p1'. intros p1 p2 ? ?. destruct SIM1 as [q1 [-> SIM1]], SIM2 as [q2 [-> SIM2]].
+    f_equal; eauto.
+  - rename p1 into p1', p2 into p2'. intros p1 p2 ? ?. destruct SIM1 as [q1 [q1' [-> [SIM1 SIM1']]]], SIM2 as [q2 [q2' [-> [SIM2 SIM2']]]].
+    f_equal; eauto.
+  - rename p1 into p1'. intros p1 p2 ? ?. destruct SIM1 as [q1 [-> SIM1]], SIM2 as [q2 [-> SIM2]].
+    f_equal; eauto.
+Qed.
 
 Lemma proves_sim_witness (p' : frm L')
   : exists p : frm L, proves_sim p p'.
-Admitted.
+Proof.
+  frm_ind p'.
+  - simpl. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
+    + exploit (embed_trms_inv _ ts). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms. rewrite H_OBS. done!.
+      intros [ts' <-]. exists (@Rel_frm L R ts'). reflexivity.
+    + exists (Eqn_frm (Var_trm 0) (Var_trm 0)). reflexivity.
+  - simpl. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
+    + exploit (embed_trm_inv t1). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H. done!.
+      exploit (embed_trm_inv t2). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H0. done!.
+      intros [t2' <-] [t1' <-]. exists (Eqn_frm t1' t2'). reflexivity.
+    + exists (Eqn_frm (Var_trm 0) (Var_trm 0)). reflexivity.
+  - simpl. destruct IH1 as [p1' IH1]. exists (Neg_frm p1'), p1'. eauto.
+  - simpl. destruct IH1 as [p1' IH1], IH2 as [p2' IH2]. exists (Imp_frm p1' p2'), p1', p2'. eauto.
+  - simpl. destruct IH1 as [p1' IH1]. exists (All_frm y p1'), p1'. eauto.
+Qed.
 
 Lemma proves_sim_intro (p : frm L)
   : proves_sim p (embed_frm p).
-Admitted.
+Proof.
+  frm_ind p; simpl.
+  - destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS; trivial.
+    s!. destruct (accum_HCs_trms _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+    pose proof (embed_trms_HC_free _ ts h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms in H.
+    contradiction H. rewrite H_OBS1. ss!.
+  - destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS; trivial.
+    s!. des.
+    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+      pose proof (embed_trm_HC_free t1 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
+      contradiction H. rewrite H_OBS1. ss!.
+    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+      pose proof (embed_trm_HC_free t2 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
+      contradiction H. rewrite H_OBS1. ss!.
+  - exists p1. eauto.
+  - exists p1, p2. eauto.
+  - exists p1. eauto.
+Qed.
 
 Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
   (PROVE : E.image embed_frm Gamma ⊢ embed_frm p)
   : Gamma ⊢ p.
 Proof.
+  assert (empty_proof_intro : forall q : frm L, proof [] q -> E.empty ⊢ q).
+  { ii. exists []. split. intros ?. done. econstructor. eassumption. }
   destruct PROVE as (ps&INCL&(PF)).
   assert (claim : exists qs : list (frm L), ps = L.map embed_frm qs).
   { clear PF p. revert Gamma INCL; induction ps as [ | p ps IH]; simpl; i.
@@ -314,8 +354,22 @@ Proof.
       { ii; eapply ps_spec; done!. }
       specialize (IHPF1 H1). specialize (IHPF2 H2). clear H1 H2 ps_spec. rename B into p, q into B.
       pose proof (proves_sim_witness A) as [q WITNESS]. eapply for_Imp_E with (p := q).
-      * eapply IHPF1. econs 4; trivial.
+      * eapply IHPF1. simpl. exists q, p. eauto.
       * eapply IHPF2; trivial.
+    + simpl in INVARIANT. des. subst q'. eapply for_All_I. done!. eapply IHPF. done!. trivial.
+    + simpl in INVARIANT. des. subst p2 q'. pose proof (proves_sim_unique _ _ _ INVARIANT0 INVARIANT3). subst p3.
+      eapply empty_proof_intro. eapply IMP1.
+    + simpl in INVARIANT. des. subst. pose proof (proves_sim_unique _ _ _ INVARIANT11 INVARIANT5) as ?; subst. clear INVARIANT11 INVARIANT5. pose proof (proves_sim_unique _ _ _ INVARIANT10 INVARIANT7) as ?. subst. clear INVARIANT10 INVARIANT7.
+      pose proof (proves_sim_unique _ _ _ INVARIANT6 INVARIANT4) as ?; subst. pose proof (proves_sim_unique _ _ _ INVARIANT4 INVARIANT8) as ?; subst. clear INVARIANT4 INVARIANT6 INVARIANT8.
+      eapply empty_proof_intro. eapply IMP2.
+    + simpl in INVARIANT. des. subst. pose proof (proves_sim_unique _ _ _ INVARIANT6 INVARIANT2) as ?; subst. clear INVARIANT2 INVARIANT6. pose proof (proves_sim_unique _ _ _ INVARIANT7 INVARIANT3) as ?; subst. clear INVARIANT7 INVARIANT3.
+      eapply empty_proof_intro. eapply CP.
+    + simpl in INVARIANT. des. subst. Search twilight_frm. admit.
+    + simpl in INVARIANT. des. subst. pose proof (proves_sim_unique _ _ _ INVARIANT0 INVARIANT2) as ?; subst. eapply empty_proof_intro. eapply FA2. admit.
+    + simpl in INVARIANT. des. subst. admit.
+    + simpl in INVARIANT. rewrite accum_HCs_trm_Var_trm in INVARIANT. simpl in INVARIANT. admit.
+    + admit.
+    + admit.
     + 
   - eapply for_Imp_E with (p := q).
     + eapply IH.
@@ -343,7 +397,7 @@ Proof.
       intros IN. s!. destruct IN as [p [EQ IN]]. apply embed_frm_inj in EQ. subst p. exact IN.
     + rewrite <- embed_frm_spec in H_p'. subst q. rename p into p', A into p.
       pose proof (INCONSISTENT (embed_frm p)) as PROVE. *)
-Admitted. *)
+Admitted.
 
 End HENKIN.
 
