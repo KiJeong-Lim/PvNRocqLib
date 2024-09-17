@@ -4,6 +4,7 @@ Require Import PnV.Math.BooleanAlgebra.
 Require Import PnV.Logic.BasicFol.
 Require Import PnV.Logic.BasicFol2.
 Require Import PnV.Logic.HilbertFol.
+Require Import PnV.Math.ThN.
 
 Import FolNotations.
 
@@ -253,7 +254,7 @@ Proof.
     + eapply for_ByHyp. rewrite E.in_image_iff. exists q. split; trivial. eapply INCL. simpl. left. trivial.
 Qed.
 
-(* Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
+Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
   (PROVE : E.image embed_frm Gamma ⊢ embed_frm p)
   : Gamma ⊢ p.
 Proof.
@@ -270,41 +271,46 @@ Proof.
   assert (PROVE : E.fromList (L.map embed_frm qs) ⊢ embed_frm p).
   { exists (L.map embed_frm qs). split. done!. econs. exact PF. }
   clear PF. revert Gamma p INCL PROVE. induction qs as [ | q qs IH]; i.
-  - clear INCL. destruct PROVE as (ps&INCL&(PF)).
+  - clear INCL. eapply extend_proves with (Gamma := E.empty). done.
+    assert (ALPHA : p ≡ subst_frm (fun z : ivar => Var_trm (z / 2)) (subst_frm (fun z : ivar => Var_trm (z * 2)) p)).
+    { symmetry. rewrite <- subst_compose_frm_spec. eapply subst_nil_frm. ii. unfold subst_compose. rewrite subst_trm_unfold. f_equal. exploit (div_mod_uniqueness (x * 2) 2 x 0); lia. }
+    rewrite ALPHA. eapply extend_proves with (Gamma := E.image (subst_frm (fun z : ivar => Var_trm (z / 2))) E.empty). done!. eapply proves_substitutivity.
+    rewrite <- twilight_frm'_embed. clear ALPHA. pose proof (frm_corr_twilight_frm' (embed_frm p)) as INVARIANT. revert INVARIANT PROVE. generalize (embed_frm p) as A.
+    clear p Gamma; i. destruct PROVE as (ps&INCL&(PF)).
     assert (ps_spec : forall q : frm L', ~ L.In q ps).
     { intros q q_in. done!. }
-    clear INCL. eapply extend_proves with (Gamma := E.empty). done.
-    clear Gamma. remember (embed_frm p) as p' eqn: H_p' in PF.
-    assert (INVARIANT : frm_corr p p').
-    { subst p'. eapply frm_corr_intro. }
-    clear H_p'. revert p INVARIANT. induction PF; intros q' ?.
+    clear INCL. revert INVARIANT. induction PF; i.
     + contradiction (ps_spec p (or_introl eq_refl)).
-    + rename p into A, q' into B.
-      assert (H1 : forall q : frm L', ~ In q ps1).
-      { ii; eapply ps_spec; done!. }
-      assert (H2 : forall q : frm L', ~ In q ps2).
-      { ii; eapply ps_spec; done!. }
-      specialize (IHPF1 H1). specialize (IHPF2 H2). clear H1 H2 ps_spec. rename B into p, q into B.
-      pose proof (frm_corr_witness A) as [q WITNESS]. eapply for_Imp_E with (p := q).
-      * eapply IHPF1. simpl. exists q, p. eauto.
-      * eapply IHPF2; trivial.
-    + simpl in INVARIANT. des. subst q'. eapply for_All_I. done!. eapply IHPF. done!. trivial.
-    + simpl in INVARIANT. des. subst p2 q'. pose proof (frm_corr_unique _ _ _ INVARIANT0 INVARIANT3). subst p3.
-      eapply empty_proof_intro. eapply IMP1.
-    + simpl in INVARIANT. des. subst. pose proof (frm_corr_unique _ _ _ INVARIANT11 INVARIANT5) as ?; subst. clear INVARIANT11 INVARIANT5. pose proof (frm_corr_unique _ _ _ INVARIANT10 INVARIANT7) as ?. subst. clear INVARIANT10 INVARIANT7.
-      pose proof (frm_corr_unique _ _ _ INVARIANT6 INVARIANT4) as ?; subst. pose proof (frm_corr_unique _ _ _ INVARIANT4 INVARIANT8) as ?; subst. clear INVARIANT4 INVARIANT6 INVARIANT8.
-      eapply empty_proof_intro. eapply IMP2.
-    + simpl in INVARIANT. des. subst. pose proof (frm_corr_unique _ _ _ INVARIANT6 INVARIANT2) as ?; subst. clear INVARIANT2 INVARIANT6. pose proof (frm_corr_unique _ _ _ INVARIANT7 INVARIANT3) as ?; subst. clear INVARIANT7 INVARIANT3.
-      eapply empty_proof_intro. eapply CP.
-    + simpl in INVARIANT. des. subst.
-      admit.
-    + simpl in INVARIANT. des. subst. pose proof (frm_corr_unique _ _ _ INVARIANT0 INVARIANT2) as ?; subst. eapply empty_proof_intro. eapply FA2. admit.
-    + simpl in INVARIANT. des. subst. admit.
-    + simpl in INVARIANT. rewrite accum_HCs_trm_Var_trm in INVARIANT. simpl in INVARIANT. admit.
-    + admit.
-    + admit.
-    + pose proof (Fun_eqAxm_HC_free f). admit.
-    + pose proof (Rel_eqAxm_HC_free R). admit.
+    + eapply for_Imp_E with (p := twilight_frm' p).
+      * eapply IHPF1. intros q' CONTRA; eapply ps_spec with (q := q'); ss!. eapply frm_corr_twilight_frm'.
+      * eapply IHPF2. intros q' CONTRA; eapply ps_spec with (q := q'); ss!. eapply frm_corr_twilight_frm'.
+    + eapply for_All_I with (p := twilight_frm' q). done!. eapply IHPF. intros q' CONTRA; eapply ps_spec with (q := q'); ss!. eapply frm_corr_twilight_frm'.
+    + simpl. eapply empty_proof_intro. eapply IMP1.
+    + simpl. eapply empty_proof_intro. eapply IMP2.
+    + simpl. eapply empty_proof_intro. eapply CP.
+    + simpl.
+      assert (ALPHA : (twilight_frm' (subst_frm (one_subst x t) p)) ≡ subst_frm (one_subst (2 * x) (twilight_trm' t)) (twilight_frm' p)).
+      { rewrite embed_frm_alpha. rewrite <- twilight_frm_decomposition. rewrite embed_subst_frm. transitivity (subst_frm (one_subst (2 * x) (twilight_trm t)) (twilight_frm p)).
+        - erewrite subst_hsubst_compat_in_frm with (p := twilight_frm p). 2: ii; reflexivity. transitivity (subst_frm (one_subst (2 * x) (twilight_trm t)) (twilight_frm p)).
+          + rewrite <- twilight_frm_one_hsubst. erewrite subst_hsubst_compat_in_frm. 2: ii; reflexivity. eapply alpha_equiv_eq_intro. f_equal.
+            eapply equiv_hsubst_in_frm_implies_hsubst_frm_same. intros [z | z] FREE; cbn.
+            * unfold one_subst, one_hsubst, cons_subst, cons_hsubst, nil_subst, nil_hsubst. destruct (eq_dec z x) as [EQ1 | NE1]; destruct (eqb _ _) as [ | ] eqn: H_OBS; rewrite eqb_spec in H_OBS; done!.
+            * reflexivity.
+          + erewrite <- subst_hsubst_compat_in_frm. 2: ii; reflexivity. reflexivity.
+        - rewrite <- twilight_frm_decomposition. eapply alpha_equiv_eq_intro. eapply equiv_subst_in_frm_implies_subst_frm_same.
+          intros u u_free. unfold one_subst, cons_subst, nil_subst, compose. destruct (eq_dec _ _) as [EQ | NE]; trivial. rewrite twilight_trm_decomposition. reflexivity.
+      }
+      rewrite ALPHA. eapply empty_proof_intro. eapply FA1.
+    + simpl. eapply empty_proof_intro. eapply FA2.
+      red. rewrite <- embed_fvs_frm. rewrite <- twilight_frm_decomposition. rewrite Nat.mul_comm. rewrite <- twilight_frm_fvs. exact NOT_FREE.
+    + simpl. eapply empty_proof_intro. eapply FA3.
+    + simpl. eapply proves_reflexivity.
+    + eapply for_Imp_I. eapply proves_symmetry. eapply for_ByHyp. done!.
+    + eapply for_Imp_I. eapply for_Imp_I. eapply proves_transitivity with (t2 := twilight_trm' (Var_trm 1)); eapply for_ByHyp; done!.
+    + rewrite <- embed_frm_Fun_eqAxm. rewrite twilight_frm'_embed. eapply extend_proves with (Gamma := E.image (subst_frm (fun z : ivar => Var_trm (z * 2))) E.empty). done!.
+      eapply proves_substitutivity. eapply empty_proof_intro. eapply EQN_FUN.
+    + rewrite <- embed_frm_Rel_eqAxm. rewrite twilight_frm'_embed. eapply extend_proves with (Gamma := E.image (subst_frm (fun z : ivar => Var_trm (z * 2))) E.empty). done!.
+      eapply proves_substitutivity. eapply empty_proof_intro. eapply EQN_REL.
   - eapply for_Imp_E with (p := q).
     + eapply IH.
       * intros p' H_in. exploit (INCL p'). ss!. intros IN. ss!.
@@ -312,12 +318,7 @@ Proof.
         { intros p' H_in. done!. }
         { exact PROVE. }
     + eapply for_ByHyp. exploit (INCL (embed_frm q)). ss!. intros IN. ss!. apply embed_frm_inj in H; subst x; done.
-Admitted. *)
-
-Lemma embed_proves_inv (Gamma : ensemble (frm L)) (p : frm L)
-  (PROVE : E.image embed_frm Gamma ⊢ embed_frm p)
-  : Gamma ⊢ p.
-Admitted.
+Qed.
 
 Theorem similar_equiconsistent (Gamma : ensemble (frm L)) (Gamma' : ensemble (frm L'))
   (SIM : Gamma =~= Gamma')

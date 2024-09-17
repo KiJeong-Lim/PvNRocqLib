@@ -1654,6 +1654,49 @@ Proof.
   - exploit IH1. done!. intros [p1' <-]. exists (All_frm y p1'). reflexivity.
 Qed.
 
+Lemma embed_frm_alpha p1 p2
+  : p1 ≡ p2 <-> embed_frm p1 ≡ embed_frm p2.
+Proof.
+  split; intros ALPHA.
+  - induction ALPHA; simpl.
+    + econs; congruence.
+    + econs; congruence.
+    + econs; congruence.
+    + econs; congruence.
+    + do 2 rewrite embed_subst_frm in IHALPHA. eapply alpha_All_frm with (z := z).
+      * etransitivity. etransitivity. 2: exact IHALPHA.
+        { eapply alpha_equiv_eq_intro. eapply equiv_subst_in_frm_implies_subst_frm_same.
+          intros u u_free. unfold compose. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec u y) as [EQ1 | NE1]; done!.
+        }
+        { eapply alpha_equiv_eq_intro. eapply equiv_subst_in_frm_implies_subst_frm_same.
+          intros u u_free. unfold compose. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec u y') as [EQ1 | NE1]; done!.
+        }
+      * change (is_free_in_frm z (embed_frm (All_frm y p1)) = false). rewrite embed_fvs_frm; trivial.
+      * change (is_free_in_frm z (embed_frm (All_frm y' p1')) = false). rewrite embed_fvs_frm; trivial.
+  - remember (embed_frm p1) as p1' eqn: H_p1'; remember (embed_frm p2) as p2' eqn: H_p2'. revert p1 p2 H_p1' H_p2'. induction ALPHA; i.
+    + subst ts'. rewrite H_p1' in H_p2'. apply embed_frm_inj in H_p2'. subst p2. reflexivity.
+    + subst t1' t2'. rewrite H_p1' in H_p2'. apply embed_frm_inj in H_p2'. subst p2. reflexivity.
+    + destruct p0; simpl in H_p1'; try congruence. destruct p2; simpl in H_p2'; try congruence.
+      inv H_p1'. inv H_p2'. econs. eapply IHALPHA; trivial.
+    + destruct p0; simpl in H_p1'; try congruence. destruct p3; simpl in H_p2'; try congruence.
+      inv H_p1'. inv H_p2'. econs; eauto.
+    + destruct p0; simpl in H_p1'; try congruence. destruct p2; simpl in H_p2'; try congruence.
+      inv H_p1'. inv H_p2'. eapply alpha_All_frm with (z := z).
+      * etransitivity. etransitivity.
+        2:{ eapply IHALPHA; [rewrite embed_subst_frm with (p := p0) (s := one_subst y0 (Var_trm z)) | rewrite embed_subst_frm with (p := p2) (s := one_subst y1 (Var_trm z))].
+          - eapply equiv_subst_in_frm_implies_subst_frm_same. intros u u_free. unfold compose, one_subst, cons_subst, nil_subst. destruct (eq_dec u y0) as [EQ1 | NE1]; done!.
+          - eapply equiv_subst_in_frm_implies_subst_frm_same. intros u u_free. unfold compose, one_subst, cons_subst, nil_subst. destruct (eq_dec u y1) as [EQ1 | NE1]; done!.
+        }
+        { eapply alpha_equiv_eq_intro. eapply equiv_subst_in_frm_implies_subst_frm_same.
+          intros u u_free. unfold compose. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec u y0) as [EQ1 | NE1]; done!.
+        }
+        { eapply alpha_equiv_eq_intro. eapply equiv_subst_in_frm_implies_subst_frm_same.
+          intros u u_free. unfold compose. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec u y1) as [EQ1 | NE1]; done!.
+        }
+      * change (is_free_in_frm z (embed_frm (All_frm y0 p0)) = false) in LFRESH. rewrite embed_fvs_frm in LFRESH; trivial.
+      * change (is_free_in_frm z (embed_frm (All_frm y1 p2)) = false) in RFRESH. rewrite embed_fvs_frm in RFRESH; trivial.
+Qed.
+
 Fixpoint twilight_trm' (t : trm L') : trm L :=
   match t with
   | Var_trm x => @Var_trm L (x * 2)
@@ -1729,6 +1772,18 @@ Proof.
 Qed.
 
 #[local] Hint Rewrite twilight_frm_decomposition.
+
+Lemma twilight_frm'_embed (p : frm L)
+  : twilight_frm' (embed_frm p) ≡ subst_frm (fun z : ivar => Var_trm (z * 2)) p.
+Proof.
+  rewrite embed_frm_alpha. rewrite <- twilight_frm_decomposition.
+  rewrite embed_subst_frm. erewrite subst_hsubst_compat_in_frm. 2: ii; reflexivity.
+  rewrite twilight_frm_spec. eapply alpha_equiv_eq_intro. eapply equiv_hsubst_in_frm_implies_hsubst_frm_same.
+  unfold to_hsubst, compose. intros [z | z] FREE.
+  - reflexivity.
+  - rewrite occurs_free_in_frm_iff in FREE. rewrite in_accum_hatom_in_frm_iff_HC_occurs_in_frm in FREE.
+    pose proof (embed_frm_HC_free p z). congruence.
+Qed.
 
 Fixpoint unembed_trm (t : trm L') : trm L :=
   match t with
@@ -1916,11 +1971,11 @@ Qed.
 
 Fixpoint frm_corr (p : frm L) (p' : frm L') {struct p'} : Prop :=
   match p' with
-  | Rel_frm R ts' => if L.null (accum_HCs_trms ts') then embed_frm p = p' else p = All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))
-  | Eqn_frm t1' t2' => if L.null (accum_HCs_trm t1') && L.null (accum_HCs_trm t2') then embed_frm p = p' else p = All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))
+  | Rel_frm R ts' => embed_frm p = hsubst_frm (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) p'
+  | Eqn_frm t1' t2' => embed_frm p = hsubst_frm (fun z : hatom => match z with inl x => Var_trm (x * 2) | inr hc => Var_trm (hc * 2 + 1) end) p'
   | Neg_frm p1' => exists p1, p = Neg_frm p1 /\ frm_corr p1 p1'
   | Imp_frm p1' p2' => exists p1, exists p2, p = Imp_frm p1 p2 /\ frm_corr p1 p1' /\ frm_corr p2 p2'
-  | All_frm y p1' => exists p1, p = All_frm y p1 /\ frm_corr p1 p1'
+  | All_frm y p1' => exists p1, p = All_frm (y * 2) p1 /\ frm_corr p1 p1'
   end.
 
 Lemma frm_corr_unique (p' : frm L') (p1 : frm L) (p2 : frm L)
@@ -1929,12 +1984,8 @@ Lemma frm_corr_unique (p' : frm L') (p1 : frm L) (p2 : frm L)
   : p1 = p2.
 Proof.
   revert p1 p2 SIM1 SIM2. frm_ind p'; simpl.
-  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
-    + eapply embed_frm_inj. congruence.
-    + congruence.
-  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
-    + eapply embed_frm_inj. congruence.
-    + congruence.
+  - intros p1 p2 ? ?. eapply embed_frm_inj. congruence.
+  - intros p1 p2 ? ?. eapply embed_frm_inj. congruence.
   - rename p1 into p1'. intros p1 p2 ? ?. destruct SIM1 as [q1 [-> SIM1]], SIM2 as [q2 [-> SIM2]].
     f_equal; eauto.
   - rename p1 into p1', p2 into p2'. intros p1 p2 ? ?. destruct SIM1 as [q1 [q1' [-> [SIM1 SIM1']]]], SIM2 as [q2 [q2' [-> [SIM2 SIM2']]]].
@@ -1943,43 +1994,15 @@ Proof.
     f_equal; eauto.
 Qed.
 
-Lemma frm_corr_witness (p' : frm L')
-  : exists p : frm L, frm_corr p p'.
+Lemma frm_corr_twilight_frm' (p' : frm L')
+  : frm_corr (twilight_frm' p') p'.
 Proof.
   frm_ind p'.
-  - simpl. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
-    + exploit (embed_trms_inv _ ts). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms. rewrite H_OBS. done!.
-      intros [ts' <-]. exists (@Rel_frm L R ts'). reflexivity.
-    + exists (All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))). reflexivity.
-  - simpl. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
-    + exploit (embed_trm_inv t1). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H. done!.
-      exploit (embed_trm_inv t2). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H0. done!.
-      intros [t2' <-] [t1' <-]. exists (Eqn_frm t1' t2'). reflexivity.
-    + exists (All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))). reflexivity.
-  - simpl. destruct IH1 as [p1' IH1]. exists (Neg_frm p1'), p1'. eauto.
-  - simpl. destruct IH1 as [p1' IH1], IH2 as [p2' IH2]. exists (Imp_frm p1' p2'), p1', p2'. eauto.
-  - simpl. destruct IH1 as [p1' IH1]. exists (All_frm y p1'), p1'. eauto.
-Qed.
-
-Lemma frm_corr_intro (p : frm L)
-  : frm_corr p (embed_frm p).
-Proof.
-  frm_ind p; simpl.
-  - destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS; trivial.
-    s!. destruct (accum_HCs_trms _) as [ | ? ?] eqn: H_OBS1; try contradiction.
-    pose proof (embed_trms_HC_free _ ts h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms in H.
-    contradiction H. rewrite H_OBS1. ss!.
-  - destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS; trivial.
-    s!. des.
-    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
-      pose proof (embed_trm_HC_free t1 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
-      contradiction H. rewrite H_OBS1. ss!.
-    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
-      pose proof (embed_trm_HC_free t2 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
-      contradiction H. rewrite H_OBS1. ss!.
-  - exists p1. eauto.
-  - exists p1, p2. eauto.
-  - exists p1. eauto.
+  - simpl. f_equal. rewrite <- twilight_trms_decomposition. eapply twilight_trms_spec.
+  - simpl. f_equal; rewrite <- twilight_trm_decomposition; eapply twilight_trm_spec.
+  - simpl; eauto.
+  - simpl; eauto.
+  - simpl. replace (y + (y + 0)) with (y * 2) by lia. eauto.
 Qed.
 
 End SIM.
