@@ -364,13 +364,15 @@ Proof.
       eapply empty_proof_intro. eapply IMP2.
     + simpl in INVARIANT. des. subst. pose proof (proves_sim_unique _ _ _ INVARIANT6 INVARIANT2) as ?; subst. clear INVARIANT2 INVARIANT6. pose proof (proves_sim_unique _ _ _ INVARIANT7 INVARIANT3) as ?; subst. clear INVARIANT7 INVARIANT3.
       eapply empty_proof_intro. eapply CP.
-    + simpl in INVARIANT. des. subst. Search twilight_frm. admit.
+    + simpl in INVARIANT. des. subst.
+      admit.
     + simpl in INVARIANT. des. subst. pose proof (proves_sim_unique _ _ _ INVARIANT0 INVARIANT2) as ?; subst. eapply empty_proof_intro. eapply FA2. admit.
     + simpl in INVARIANT. des. subst. admit.
     + simpl in INVARIANT. rewrite accum_HCs_trm_Var_trm in INVARIANT. simpl in INVARIANT. admit.
     + admit.
     + admit.
-    + 
+    + pose proof (Fun_eqAxm_HC_free f). admit.
+    + admit.
   - eapply for_Imp_E with (p := q).
     + eapply IH.
       * intros p' H_in. exploit (INCL p'). ss!. intros IN. ss!.
@@ -390,14 +392,10 @@ Proof.
     rewrite <- embed_frms_spec in SIM. rewrite <- SIM. split.
     + eapply embed_proves; trivial.
     + change (E.image embed_frm Gamma ⊢ embed_frm (Neg_frm p)). eapply embed_proves; trivial.
-  - admit. (* rewrite <- embed_frms_spec in SIM. intros p. pose proof (INCONSISTENT (embed_frm p)) as PROVE.
-    rewrite <- SIM in PROVE. destruct PROVE as (ps&INCL&(PF)).
-    remember (embed_frm p) as p' eqn: H_p' in PF. symmetry in H_p'. rewrite embed_frm_spec in H_p'. rename p into A. revert A H_p'. induction PF; i.
-    + eapply for_ByHyp. rewrite <- embed_frm_spec in H_p'. subst p. exploit (INCL (embed_frm A)). done!.
-      intros IN. s!. destruct IN as [p [EQ IN]]. apply embed_frm_inj in EQ. subst p. exact IN.
-    + rewrite <- embed_frm_spec in H_p'. subst q. rename p into p', A into p.
-      pose proof (INCONSISTENT (embed_frm p)) as PROVE. *)
-Admitted.
+  - intros p. pose proof (INCONSISTENT (embed_frm p)) as claim.
+    rewrite <- embed_frms_spec in SIM. rewrite <- SIM in claim.
+    eapply embed_proves_inv. exact claim.
+Qed.
 
 End HENKIN.
 
