@@ -1914,6 +1914,74 @@ Proof.
   - ii. unfold one_subst, cons_subst, nil_subst. destruct (eq_dec _ _) as [EQ1 | NE1]; trivial. rewrite unembed_trm_fvs; trivial.
 Qed.
 
+Fixpoint frm_corr (p : frm L) (p' : frm L') {struct p'} : Prop :=
+  match p' with
+  | Rel_frm R ts' => if L.null (accum_HCs_trms ts') then embed_frm p = p' else p = All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))
+  | Eqn_frm t1' t2' => if L.null (accum_HCs_trm t1') && L.null (accum_HCs_trm t2') then embed_frm p = p' else p = All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))
+  | Neg_frm p1' => exists p1, p = Neg_frm p1 /\ frm_corr p1 p1'
+  | Imp_frm p1' p2' => exists p1, exists p2, p = Imp_frm p1 p2 /\ frm_corr p1 p1' /\ frm_corr p2 p2'
+  | All_frm y p1' => exists p1, p = All_frm y p1 /\ frm_corr p1 p1'
+  end.
+
+Lemma frm_corr_unique (p' : frm L') (p1 : frm L) (p2 : frm L)
+  (SIM1 : frm_corr p1 p')
+  (SIM2 : frm_corr p2 p')
+  : p1 = p2.
+Proof.
+  revert p1 p2 SIM1 SIM2. frm_ind p'; simpl.
+  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
+    + eapply embed_frm_inj. congruence.
+    + congruence.
+  - intros p1 p2 ? ?. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
+    + eapply embed_frm_inj. congruence.
+    + congruence.
+  - rename p1 into p1'. intros p1 p2 ? ?. destruct SIM1 as [q1 [-> SIM1]], SIM2 as [q2 [-> SIM2]].
+    f_equal; eauto.
+  - rename p1 into p1', p2 into p2'. intros p1 p2 ? ?. destruct SIM1 as [q1 [q1' [-> [SIM1 SIM1']]]], SIM2 as [q2 [q2' [-> [SIM2 SIM2']]]].
+    f_equal; eauto.
+  - rename p1 into p1'. intros p1 p2 ? ?. destruct SIM1 as [q1 [-> SIM1]], SIM2 as [q2 [-> SIM2]].
+    f_equal; eauto.
+Qed.
+
+Lemma frm_corr_witness (p' : frm L')
+  : exists p : frm L, frm_corr p p'.
+Proof.
+  frm_ind p'.
+  - simpl. destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS.
+    + exploit (embed_trms_inv _ ts). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms. rewrite H_OBS. done!.
+      intros [ts' <-]. exists (@Rel_frm L R ts'). reflexivity.
+    + exists (All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))). reflexivity.
+  - simpl. destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS.
+    + exploit (embed_trm_inv t1). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H. done!.
+      exploit (embed_trm_inv t2). ss!. eapply not_true_iff_false. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm. rewrite H0. done!.
+      intros [t2' <-] [t1' <-]. exists (Eqn_frm t1' t2'). reflexivity.
+    + exists (All_frm 0 (Eqn_frm (Var_trm 0) (Var_trm 0))). reflexivity.
+  - simpl. destruct IH1 as [p1' IH1]. exists (Neg_frm p1'), p1'. eauto.
+  - simpl. destruct IH1 as [p1' IH1], IH2 as [p2' IH2]. exists (Imp_frm p1' p2'), p1', p2'. eauto.
+  - simpl. destruct IH1 as [p1' IH1]. exists (All_frm y p1'), p1'. eauto.
+Qed.
+
+Lemma frm_corr_intro (p : frm L)
+  : frm_corr p (embed_frm p).
+Proof.
+  frm_ind p; simpl.
+  - destruct (L.null (accum_HCs_trms _)) as [ | ] eqn: H_OBS; trivial.
+    s!. destruct (accum_HCs_trms _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+    pose proof (embed_trms_HC_free _ ts h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trms_iff_in_accumHCs_trms in H.
+    contradiction H. rewrite H_OBS1. ss!.
+  - destruct (L.null (accum_HCs_trm _) && L.null (accum_HCs_trm _)) as [ | ] eqn: H_OBS; trivial.
+    s!. des.
+    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+      pose proof (embed_trm_HC_free t1 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
+      contradiction H. rewrite H_OBS1. ss!.
+    + destruct (accum_HCs_trm _) as [ | ? ?] eqn: H_OBS1; try contradiction.
+      pose proof (embed_trm_HC_free t2 h). rewrite <- not_true_iff_false in H. rewrite HC_occurs_in_trm_iff_in_accumHCs_trm in H.
+      contradiction H. rewrite H_OBS1. ss!.
+  - exists p1. eauto.
+  - exists p1, p2. eauto.
+  - exists p1. eauto.
+Qed.
+
 End SIM.
 
 Context {enum_function_symbols : isEnumerable L.(function_symbols)} {enum_constant_symbols : isEnumerable L.(constant_symbols)} {enum_relation_symbols : isEnumerable L.(relation_symbols)}.
